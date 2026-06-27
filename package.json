@@ -1,7 +1,7 @@
 {
   "name": "okusuri-techo",
   "main": "expo-router/entry",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "dependencies": {
     "@expo-google-fonts/m-plus-rounded-1c": "^0.4.3",
     "@expo/ui": "~56.0.18",
