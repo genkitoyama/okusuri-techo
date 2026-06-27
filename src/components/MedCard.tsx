@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Medication } from '@/db/queries';
 import { Colors, Radius, Shadow, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
+import { describeSchedule } from '@/utils/schedule';
 
 type Props = {
   med: Medication;
@@ -10,7 +11,7 @@ type Props = {
 };
 
 export function MedCard({ med, onPress }: Props) {
-  const interval = med.interval_days === 1 ? '毎日' : `${med.interval_days}日おき`;
+  const scheduleLabel = describeSchedule(med);
   return (
     <Pressable
       onPress={onPress}
@@ -20,7 +21,7 @@ export function MedCard({ med, onPress }: Props) {
       <View style={styles.body}>
         <Text style={styles.name}>{med.name}</Text>
         <Text style={styles.meta}>
-          {interval} ・ {med.reminder_time}
+          {scheduleLabel} ・ {med.reminder_time}
           {med.dose ? ` ・ ${med.dose}` : ''}
         </Text>
         {med.note ? (

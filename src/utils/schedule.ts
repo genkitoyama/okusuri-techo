@@ -13,6 +13,26 @@ export function buildIsoKey(date: Date): string {
   return `${format(date, 'yyyy-MM-dd')}T${format(date, 'HH:mm')}`;
 }
 
+const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+
+export function describeSchedule(
+  med: Pick<Medication, 'schedule_type' | 'interval_days' | 'monthly_day' | 'weekly_days'>
+): string {
+  if (med.schedule_type === 'monthly' && med.monthly_day != null) {
+    return `毎月${med.monthly_day}日`;
+  }
+  if (med.schedule_type === 'weekly' && med.weekly_days) {
+    const sel = med.weekly_days
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+      .map((n) => WEEK_LABELS[n])
+      .join('・');
+    return sel ? `毎週 ${sel}` : '毎週';
+  }
+  return med.interval_days === 1 ? '毎日' : `${med.interval_days}日おき`;
+}
+
 export function parseReminderTimes(reminder_time: string): string[] {
   return reminder_time
     .split(',')
