@@ -1,56 +1,130 @@
-# Welcome to your Expo app 👋
+# おくすり手帳 🐶💊
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+愛犬と奥さんの服薬を、可愛らしくシンプルに管理する Android アプリ。
 
-## Get started
+## 機能
 
-1. Install dependencies
+- 🐶 / 👩 の **2プロファイル切替**
+- お薬を **「N日おき＋指定時刻」** で登録（毎日、2日おき、3日おき、週1、2週ごと、月1 …）
+- 指定時刻にスマホ通知 → **「✓ あげた」** をタップで履歴に記録
+- カレンダー画面で月単位の予定 / 履歴をひと目で確認
+- 全データは端末ローカル SQLite に保存（クラウド同期なし）
 
-   ```bash
-   npm install
-   ```
+## 技術スタック
 
-2. Start the app
+| カテゴリ | 採用 |
+|---|---|
+| フレームワーク | Expo SDK 56 + React Native 0.85 + TypeScript |
+| ルーティング | `expo-router`（ファイルベース） |
+| ローカルDB | `expo-sqlite` |
+| 通知 | `expo-notifications` |
+| カレンダーUI | `react-native-calendars` |
+| 状態管理 | `zustand` + `AsyncStorage` |
+| 日付処理 | `date-fns` |
+| フォント | `M PLUS Rounded 1c`（Google Fonts） |
+| アイコン | `@expo/vector-icons` (Ionicons) |
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## セットアップ
 
 ```bash
-npm run reset-project
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 開発
 
-### Other setup steps
+```bash
+npx expo start
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+ターミナルに表示される QR コードを **Expo Go** アプリで読み取る、または `a`（Android emulator）/ `i`（iOS sim）/ `w`（Web）。
 
-## Learn more
+> 通知の **本物の挙動**（アクションボタン、バックグラウンド受信）は Expo Go では一部制限があります。確実に確認したいときは開発ビルドで：
+>
+> ```bash
+> npx expo run:android
+> ```
 
-To learn more about developing your project with Expo, look at the following resources:
+## Android ビルド（配布用 APK）
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+EAS を使うのが一番楽です。初回のみ：
 
-## Join the community
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+```
 
-Join our community of developers creating universal apps.
+ビルド：
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+eas build -p android --profile preview
+```
+
+ビルド完了後、出力された `.apk` を端末に直接インストール（共有リンク経由 or USB）。
+
+## フォルダ構成
+
+```
+src/
+├── app/                 # expo-router
+│   ├── _layout.tsx      # ルート（フォント・DB・通知の起動）
+│   ├── (tabs)/          # ホーム / カレンダー / お薬 / 設定
+│   └── meds/            # 薬の新規追加 / 編集 (modal)
+├── components/          # 共通UIパーツ
+│   ├── ProfileSwitcher.tsx
+│   ├── MedCard.tsx
+│   ├── DoseChecklistItem.tsx
+│   ├── MedicationForm.tsx
+│   └── ...
+├── db/                  # SQLite
+│   ├── client.ts
+│   ├── migrations.ts
+│   └── queries.ts
+├── notifications/       # 通知レイヤ
+│   ├── schedule.ts      # 予約・キャンセル
+│   └── handler.ts       # アクション受信
+├── store/               # zustand
+│   └── profile.ts
+├── theme/               # 色・フォント
+│   ├── colors.ts
+│   └── typography.ts
+└── utils/               # 日付・スケジュール展開
+    ├── date.ts
+    └── schedule.ts
+```
+
+## データモデル
+
+3 テーブル構成（SQLite, `src/db/migrations.ts`）。
+
+| テーブル | 内容 |
+|---|---|
+| `profiles` | 愛犬・奥さんなどのプロファイル（`name`, `kind`, `avatar_emoji`） |
+| `medications` | お薬本体（`profile_id`, `name`, `dose`, `interval_days`, `start_date`, `reminder_time`, `color`, `note`） |
+| `dose_logs` | 服薬記録（`medication_id`, `scheduled_at`, `taken_at`, `status`） |
+
+`dose_logs` は「あげた」「スキップした」ものだけ記録します。pending（未消化）は事前生成せず、表示時に `medications` から展開します。
+
+## 通知の仕組み
+
+- 薬を追加 / 編集すると、**向こう 60 日分** の通知が一括予約されます（`expo-notifications` の DateTrigger）。
+- 通知には「✓ あげた」アクションが付与されており、タップで `dose_logs` に taken が書き込まれます（`src/notifications/handler.ts`）。
+- 60 日を超えて使い続けたとき / 通知が来なくなったときは、**設定画面 →「通知を再登録」** で全通知をリフレッシュできます。
+
+## デザイン方針
+
+| 用途 | 色 |
+|---|---|
+| 背景 | クリーム `#FFF8F0` |
+| カード | 純白 `#FFFFFF` |
+| メイン | ミルクティーベージュ `#D4A574` |
+| 犬アクセント | ピンク `#FFB6B9` |
+| 人アクセント | ミントグリーン `#A8D8B9` |
+
+フォントは丸ゴシックの `M PLUS Rounded 1c`、角丸は 16〜24px、絵文字を積極活用。
+
+## 既知の制約 / 今後の改善
+
+- クラウド同期なし（端末を変えるとデータが消える）
+- 通知は端末ローカル予約のみ（OS が予約をクリアすると失われる → 設定画面の「再登録」で復旧可）
+- 薬の写真添付、在庫管理、ホーム画面ウィジェットは未対応
