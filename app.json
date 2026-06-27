@@ -47,6 +47,31 @@
           "photosPermission": "ワンちゃんや奥さんのプロファイル写真を選ぶために、写真ライブラリへのアクセスを許可してください。",
           "cameraPermission": "ワンちゃんや奥さんのプロファイル写真を撮影するために、カメラへのアクセスを許可してください。"
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "widgets": [
+            {
+              "name": "OkusuriSmall",
+              "label": "おくすり手帳 (小)",
+              "minWidth": "180dp",
+              "minHeight": "110dp",
+              "description": "今日のお薬サマリー",
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable"
+            },
+            {
+              "name": "OkusuriMedium",
+              "label": "おくすり手帳 (中)",
+              "minWidth": "260dp",
+              "minHeight": "200dp",
+              "description": "今日のお薬リスト",
+              "resizeMode": "horizontal|vertical",
+              "widgetFeatures": "reconfigurable"
+            }
+          ]
+        }
       ]
     ],
     "experiments": {

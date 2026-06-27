@@ -71,6 +71,11 @@ export default function SettingsScreen() {
                 profile={p}
                 onSave={async (name, emoji, photo_uri) => {
                   await updateProfile(p.id, name, emoji, photo_uri);
+                  try {
+                    const all = await listProfiles();
+                    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+                    await AsyncStorage.setItem('okusuri:profiles-cache', JSON.stringify(all));
+                  } catch {}
                   await load();
                 }}
               />

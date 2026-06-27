@@ -9,11 +9,25 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import { listProfiles } from '@/db/queries';
 import { runMigrations } from '@/db/migrations';
 import { setupNotificationResponseListener } from '@/notifications/handler';
 import { setupNotifications } from '@/notifications/schedule';
 import { Colors } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
+
+const PROFILES_CACHE_KEY = 'okusuri:profiles-cache';
+
+async function refreshProfilesCache() {
+  try {
+    const profs = await listProfiles();
+    await AsyncStorage.setItem(PROFILES_CACHE_KEY, JSON.stringify(profs));
+  } catch (e) {
+    console.warn('[bootstrap] profiles cache error', e);
+  }
+}
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -30,6 +44,7 @@ export default function RootLayout() {
     (async () => {
       try {
         await runMigrations();
+        await refreshProfilesCache();
         await setupNotifications();
         cleanup = setupNotificationResponseListener();
       } catch (e) {
