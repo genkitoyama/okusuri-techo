@@ -43,7 +43,35 @@ export async function runMigrations(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_medications_profile ON medications(profile_id);
     CREATE INDEX IF NOT EXISTS idx_dose_logs_medication ON dose_logs(medication_id);
     CREATE INDEX IF NOT EXISTS idx_dose_logs_scheduled ON dose_logs(scheduled_at);
+
+    CREATE TABLE IF NOT EXISTS med_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      medication_id INTEGER,
+      profile_id INTEGER,
+      medication_name TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      payload TEXT,
+      created_at INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_med_events_medication ON med_events(medication_id);
+    CREATE INDEX IF NOT EXISTS idx_med_events_profile ON med_events(profile_id);
+    CREATE INDEX IF NOT EXISTS idx_med_events_created ON med_events(created_at);
   `);
+
+  const medCols = await db.getAllAsync<{ name: string }>(
+    "PRAGMA table_info('medications')"
+  );
+  if (!medCols.some((c) => c.name === 'schedule_type')) {
+    await db.execAsync(
+      "ALTER TABLE medications ADD COLUMN schedule_type TEXT NOT NULL DEFAULT 'interval'"
+    );
+  }
+  if (!medCols.some((c) => c.name === 'monthly_day')) {
+    await db.execAsync('ALTER TABLE medications ADD COLUMN monthly_day INTEGER');
+  }
+  if (!medCols.some((c) => c.name === 'weekly_days')) {
+    await db.execAsync('ALTER TABLE medications ADD COLUMN weekly_days TEXT');
+  }
 
   const profileCols = await db.getAllAsync<{ name: string }>(
     "PRAGMA table_info('profiles')"

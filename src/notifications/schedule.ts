@@ -3,7 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { listAllActiveMedications, listProfiles, Medication } from '@/db/queries';
-import { expandSchedule } from '@/utils/schedule';
+import { expandScheduleForMedication } from '@/utils/schedule';
 
 export const DOSE_CATEGORY_ID = 'DOSE';
 export const NOTIFICATION_CHANNEL_ID = 'medication-reminders';
@@ -61,13 +61,7 @@ export async function scheduleMedicationNotifications(
   if (isWeb) return;
   const now = new Date();
   const horizon = addDays(now, SCHEDULE_HORIZON_DAYS);
-  const doses = expandSchedule(
-    med.start_date,
-    med.reminder_time,
-    med.interval_days,
-    now,
-    horizon
-  );
+  const doses = expandScheduleForMedication(med, now, horizon);
 
   for (const dose of doses) {
     await Notifications.scheduleNotificationAsync({

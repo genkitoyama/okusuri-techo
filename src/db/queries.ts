@@ -1,3 +1,5 @@
+import * as SQLite from 'expo-sqlite';
+
 import { getDb } from './client';
 
 export type ProfileKind = 'dog' | 'human';
@@ -11,6 +13,8 @@ export type Profile = {
   created_at: number;
 };
 
+export type ScheduleType = 'interval' | 'monthly' | 'weekly';
+
 export type Medication = {
   id: number;
   profile_id: number;
@@ -21,7 +25,27 @@ export type Medication = {
   reminder_time: string;
   color: string;
   note: string | null;
+  schedule_type: ScheduleType;
+  monthly_day: number | null;
+  weekly_days: string | null;
   is_active: number;
+  created_at: number;
+};
+
+export type MedEventType =
+  | 'add'
+  | 'stop'
+  | 'update_dose'
+  | 'update_interval'
+  | 'update_time';
+
+export type MedEvent = {
+  id: number;
+  medication_id: number | null;
+  profile_id: number | null;
+  medication_name: string;
+  event_type: MedEventType;
+  payload: string | null;
   created_at: number;
 };
 
@@ -89,13 +113,39 @@ export async function getMedication(id: number): Promise<Medication | null> {
   return db.getFirstAsync<Medication>('SELECT * FROM medications WHERE id = ?', id);
 }
 
+async function recordEvent(
+  db: SQLite.SQLiteDatabase,
+  event: Omit<MedEvent, 'id' | 'created_at'>
+): Promise<void> {
+  const now = Date.now();
+  await db.runAsync(
+    `INSERT INTO med_events (medication_id, profile_id, medication_name, event_type, payload, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    event.medication_id,
+    event.profile_id,
+    event.medication_name,
+    event.event_type,
+    event.payload,
+    now
+  );
+}
+
+function scheduleSnapshot(med: NewMedication | Medication) {
+  return {
+    schedule_type: med.schedule_type,
+    interval_days: med.interval_days,
+    monthly_day: med.monthly_day,
+    weekly_days: med.weekly_days,
+  };
+}
+
 export async function createMedication(med: NewMedication): Promise<number> {
   const db = await getDb();
   const now = Date.now();
   const result = await db.runAsync(
     `INSERT INTO medications
-       (profile_id, name, dose, interval_days, start_date, reminder_time, color, note, is_active, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+       (profile_id, name, dose, interval_days, start_date, reminder_time, color, note, schedule_type, monthly_day, weekly_days, is_active, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
     med.profile_id,
     med.name,
     med.dose,
@@ -104,17 +154,34 @@ export async function createMedication(med: NewMedication): Promise<number> {
     med.reminder_time,
     med.color,
     med.note,
+    med.schedule_type,
+    med.monthly_day,
+    med.weekly_days,
     now
   );
-  return result.lastInsertRowId as number;
+  const id = result.lastInsertRowId as number;
+  await recordEvent(db, {
+    medication_id: id,
+    profile_id: med.profile_id,
+    medication_name: med.name,
+    event_type: 'add',
+    payload: JSON.stringify({
+      dose: med.dose,
+      reminder_time: med.reminder_time,
+      ...scheduleSnapshot(med),
+    }),
+  });
+  return id;
 }
 
 export async function updateMedication(id: number, med: MedicationUpdate): Promise<void> {
   const db = await getDb();
+  const before = await getMedication(id);
+
   await db.runAsync(
     `UPDATE medications
         SET name = ?, dose = ?, interval_days = ?, start_date = ?,
-            reminder_time = ?, color = ?, note = ?
+            reminder_time = ?, color = ?, note = ?, schedule_type = ?, monthly_day = ?, weekly_days = ?
       WHERE id = ?`,
     med.name,
     med.dose,
@@ -123,13 +190,84 @@ export async function updateMedication(id: number, med: MedicationUpdate): Promi
     med.reminder_time,
     med.color,
     med.note,
+    med.schedule_type,
+    med.monthly_day,
+    med.weekly_days,
     id
   );
+
+  if (!before) return;
+
+  if (before.dose !== med.dose) {
+    await recordEvent(db, {
+      medication_id: id,
+      profile_id: before.profile_id,
+      medication_name: med.name,
+      event_type: 'update_dose',
+      payload: JSON.stringify({ from: before.dose, to: med.dose }),
+    });
+  }
+  if (
+    before.schedule_type !== med.schedule_type ||
+    before.interval_days !== med.interval_days ||
+    before.monthly_day !== med.monthly_day ||
+    before.weekly_days !== med.weekly_days
+  ) {
+    await recordEvent(db, {
+      medication_id: id,
+      profile_id: before.profile_id,
+      medication_name: med.name,
+      event_type: 'update_interval',
+      payload: JSON.stringify({
+        from: scheduleSnapshot(before),
+        to: scheduleSnapshot({ ...before, ...med }),
+      }),
+    });
+  }
+  if (before.reminder_time !== med.reminder_time) {
+    await recordEvent(db, {
+      medication_id: id,
+      profile_id: before.profile_id,
+      medication_name: med.name,
+      event_type: 'update_time',
+      payload: JSON.stringify({ from: before.reminder_time, to: med.reminder_time }),
+    });
+  }
 }
 
 export async function deleteMedication(id: number): Promise<void> {
   const db = await getDb();
+  const before = await getMedication(id);
   await db.runAsync('DELETE FROM medications WHERE id = ?', id);
+  if (before) {
+    await recordEvent(db, {
+      medication_id: null,
+      profile_id: before.profile_id,
+      medication_name: before.name,
+      event_type: 'stop',
+      payload: null,
+    });
+  }
+}
+
+export async function listMedEvents(filter?: {
+  profile_id?: number;
+  medication_id?: number;
+}): Promise<MedEvent[]> {
+  const db = await getDb();
+  if (filter?.profile_id != null) {
+    return db.getAllAsync<MedEvent>(
+      'SELECT * FROM med_events WHERE profile_id = ? ORDER BY created_at DESC',
+      filter.profile_id
+    );
+  }
+  if (filter?.medication_id != null) {
+    return db.getAllAsync<MedEvent>(
+      'SELECT * FROM med_events WHERE medication_id = ? ORDER BY created_at DESC',
+      filter.medication_id
+    );
+  }
+  return db.getAllAsync<MedEvent>('SELECT * FROM med_events ORDER BY created_at DESC');
 }
 
 // --- dose logs ------------------------------------------------

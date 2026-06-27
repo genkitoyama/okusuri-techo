@@ -15,7 +15,7 @@ import {
 import { useProfileStore } from '@/store/profile';
 import { Colors, Radius, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
-import { expandSchedule } from '@/utils/schedule';
+import { expandScheduleForMedication } from '@/utils/schedule';
 
 LocaleConfig.locales['ja'] = {
   monthNames: [
@@ -73,10 +73,8 @@ export default function CalendarScreen() {
     const monthEnd = endOfMonth(currentMonth);
     const acc: Record<string, { dots: Array<{ key: string; color: string }> }> = {};
     for (const m of meds) {
-      const doses = expandSchedule(
-        m.start_date,
-        m.reminder_time,
-        m.interval_days,
+      const doses = expandScheduleForMedication(
+        m,
         subDays(monthStart, 5),
         addDays(monthEnd, 5)
       );
@@ -100,13 +98,7 @@ export default function CalendarScreen() {
     const logKey = (mid: number, iso: string) => `${mid}|${iso}`;
     const logMap = new Map(logs.map((l) => [logKey(l.medication_id, l.scheduled_at), l]));
     for (const m of meds) {
-      const doses = expandSchedule(
-        m.start_date,
-        m.reminder_time,
-        m.interval_days,
-        dayStart,
-        dayEnd
-      );
+      const doses = expandScheduleForMedication(m, dayStart, dayEnd);
       for (const d of doses) {
         out.push({
           med: m,

@@ -21,7 +21,7 @@ import { useProfileStore } from '@/store/profile';
 import { Colors, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
 import { isoNow, jpDateLong } from '@/utils/date';
-import { expandSchedule } from '@/utils/schedule';
+import { expandScheduleForMedication } from '@/utils/schedule';
 
 type DoseEntry = {
   med: Medication;
@@ -64,13 +64,7 @@ export default function HomeScreen() {
     const tomorrowDate = addDays(now, 1);
 
     for (const m of meds) {
-      const doses = expandSchedule(
-        m.start_date,
-        m.reminder_time,
-        m.interval_days,
-        todayStart,
-        tomorrowEnd
-      );
+      const doses = expandScheduleForMedication(m, todayStart, tomorrowEnd);
       for (const d of doses) {
         const entry: DoseEntry = {
           med: m,
