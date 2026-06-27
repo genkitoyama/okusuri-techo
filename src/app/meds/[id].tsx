@@ -74,6 +74,9 @@ export default function EditMedicationScreen() {
         reminder_time: med.reminder_time,
         color: med.color,
         note: med.note,
+        schedule_type: med.schedule_type,
+        monthly_day: med.monthly_day,
+        weekly_days: med.weekly_days,
       }}
       submitLabel="変更を保存"
       onSubmit={handleSubmit}

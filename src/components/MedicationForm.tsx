@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { ScheduleType } from '@/db/queries';
 import { Colors, MedColors, Radius, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
 import { jpDateLong, ymd } from '@/utils/date';
@@ -25,6 +26,9 @@ export type MedicationFormData = {
   reminder_time: string;
   color: string;
   note: string | null;
+  schedule_type: ScheduleType;
+  monthly_day: number | null;
+  weekly_days: string | null;
 };
 
 type Props = {
@@ -35,6 +39,7 @@ type Props = {
 };
 
 const INTERVAL_PRESETS = [1, 2, 3, 4, 5, 6, 7, 14, 30];
+const WEEK_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
 export function MedicationForm({
   initial,
@@ -44,7 +49,20 @@ export function MedicationForm({
 }: Props) {
   const [name, setName] = useState(initial?.name ?? '');
   const [dose, setDose] = useState(initial?.dose ?? '');
+  const [scheduleType, setScheduleType] = useState<ScheduleType>(
+    initial?.schedule_type ?? 'interval'
+  );
   const [intervalDays, setIntervalDays] = useState(initial?.interval_days ?? 1);
+  const [monthlyDay, setMonthlyDay] = useState(initial?.monthly_day ?? 15);
+  const [weeklyDays, setWeeklyDays] = useState<Set<number>>(() => {
+    const arr = initial?.weekly_days
+      ? initial.weekly_days
+          .split(',')
+          .map((s) => Number(s.trim()))
+          .filter((n) => Number.isInteger(n) && n >= 0 && n <= 6)
+      : [1];
+    return new Set(arr);
+  });
   const [startDate, setStartDate] = useState(initial?.start_date ?? ymd(new Date()));
   const [reminderTimes, setReminderTimes] = useState<string[]>(() => {
     const parsed = parseReminderTimes(initial?.reminder_time ?? '');
@@ -58,7 +76,11 @@ export function MedicationForm({
   const [timePickerIndex, setTimePickerIndex] = useState<number | null>(null);
 
   const startAsDate = new Date(`${startDate}T00:00:00`);
-  const canSave = name.trim().length > 0 && reminderTimes.length > 0 && !submitting;
+  const canSave =
+    name.trim().length > 0 &&
+    reminderTimes.length > 0 &&
+    !submitting &&
+    (scheduleType !== 'weekly' || weeklyDays.size > 0);
 
   const handleSave = async () => {
     if (!canSave) return;
@@ -73,6 +95,12 @@ export function MedicationForm({
         reminder_time: uniqueTimes.join(','),
         color,
         note: note.trim() || null,
+        schedule_type: scheduleType,
+        monthly_day: scheduleType === 'monthly' ? monthlyDay : null,
+        weekly_days:
+          scheduleType === 'weekly'
+            ? Array.from(weeklyDays).sort().join(',')
+            : null,
       });
     } finally {
       setSubmitting(false);
@@ -95,6 +123,15 @@ export function MedicationForm({
     const m = String(d.getMinutes()).padStart(2, '0');
     const newTime = `${h}:${m}`;
     setReminderTimes((prev) => prev.map((t, i) => (i === index ? newTime : t)));
+  };
+
+  const toggleWeekDay = (idx: number) => {
+    setWeeklyDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
   };
 
   return (
@@ -123,30 +160,120 @@ export function MedicationForm({
         />
       </Field>
 
-      <Field label="何日おき">
-        <View style={styles.chipRow}>
-          {INTERVAL_PRESETS.map((n) => {
-            const active = intervalDays === n;
-            return (
-              <Pressable
-                key={n}
-                onPress={() => setIntervalDays(n)}
+      <Field label="スケジュール">
+        <View style={styles.segmentRow}>
+          {(['interval', 'monthly', 'weekly'] as ScheduleType[]).map((t) => (
+            <Pressable
+              key={t}
+              onPress={() => setScheduleType(t)}
+              style={[
+                styles.segment,
+                scheduleType === t && styles.segmentActive,
+              ]}
+            >
+              <Text
                 style={[
-                  styles.chip,
-                  active && {
-                    backgroundColor: Colors.primary,
-                    borderColor: Colors.primary,
-                  },
+                  styles.segmentText,
+                  scheduleType === t && styles.segmentTextActive,
                 ]}
               >
-                <Text style={[styles.chipText, active && { color: '#FFF' }]}>
-                  {n === 1 ? '毎日' : `${n}日おき`}
-                </Text>
-              </Pressable>
-            );
-          })}
+                {t === 'interval' ? 'N日おき' : t === 'monthly' ? '毎月' : '毎週'}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       </Field>
+
+      {scheduleType === 'interval' ? (
+        <Field label="何日おき">
+          <View style={styles.chipRow}>
+            {INTERVAL_PRESETS.map((n) => {
+              const active = intervalDays === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => setIntervalDays(n)}
+                  style={[
+                    styles.chip,
+                    active && {
+                      backgroundColor: Colors.primary,
+                      borderColor: Colors.primary,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, active && { color: '#FFF' }]}>
+                    {n === 1 ? '毎日' : `${n}日おき`}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Field>
+      ) : null}
+
+      {scheduleType === 'monthly' ? (
+        <Field label="毎月の日付">
+          <View style={styles.chipRow}>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
+              const active = monthlyDay === d;
+              return (
+                <Pressable
+                  key={d}
+                  onPress={() => setMonthlyDay(d)}
+                  style={[
+                    styles.dayChip,
+                    active && {
+                      backgroundColor: Colors.primary,
+                      borderColor: Colors.primary,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, active && { color: '#FFF' }]}>
+                    {d}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {monthlyDay > 28 ? (
+            <Text style={styles.hint}>
+              ※ その月にない日は自動で月末に補正されます（例：31日 → 2月は28/29日）
+            </Text>
+          ) : null}
+        </Field>
+      ) : null}
+
+      {scheduleType === 'weekly' ? (
+        <Field label="曜日(複数選択可)">
+          <View style={styles.chipRow}>
+            {WEEK_LABELS.map((label, idx) => {
+              const active = weeklyDays.has(idx);
+              return (
+                <Pressable
+                  key={idx}
+                  onPress={() => toggleWeekDay(idx)}
+                  style={[
+                    styles.weekChip,
+                    active && {
+                      backgroundColor: Colors.primary,
+                      borderColor: Colors.primary,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      active && { color: '#FFF' },
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Field>
+      ) : null}
 
       <Field label="開始日">
         <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
@@ -276,6 +403,29 @@ const styles = StyleSheet.create({
   },
   inputText: { fontFamily: FontFamily.regular, fontSize: 15, color: Colors.text },
   multiline: { minHeight: 80, textAlignVertical: 'top' },
+  hint: {
+    fontFamily: FontFamily.regular,
+    fontSize: 12,
+    color: Colors.textSub,
+    marginTop: 4,
+  },
+  segmentRow: {
+    flexDirection: 'row',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.pill,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  segment: {
+    flex: 1,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
+    alignItems: 'center',
+  },
+  segmentActive: { backgroundColor: Colors.primary },
+  segmentText: { fontFamily: FontFamily.medium, fontSize: 13, color: Colors.textSub },
+  segmentTextActive: { color: '#FFF' },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: {
     backgroundColor: Colors.card,
@@ -286,6 +436,26 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
   chipText: { fontFamily: FontFamily.medium, fontSize: 13, color: Colors.text },
+  dayChip: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weekChip: {
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   colorChip: {
     width: 36,
     height: 36,
