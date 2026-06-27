@@ -1,5 +1,5 @@
-import { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { ReactElement, ReactNode } from 'react';
+import { RefreshControlProps, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Colors, Spacing } from '@/theme/colors';
@@ -7,7 +7,7 @@ import { Colors, Spacing } from '@/theme/colors';
 type Props = {
   children: ReactNode;
   scroll?: boolean;
-  refreshControl?: React.ReactElement;
+  refreshControl?: ReactElement<RefreshControlProps>;
 };
 
 export function ScreenContainer({ children, scroll, refreshControl }: Props) {

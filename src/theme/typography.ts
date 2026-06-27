@@ -2,9 +2,9 @@ import { TextStyle } from 'react-native';
 import { Colors } from './colors';
 
 export const FontFamily = {
-  regular: 'MPlusRounded1c_400Regular',
-  medium: 'MPlusRounded1c_500Medium',
-  bold: 'MPlusRounded1c_700Bold',
+  regular: 'MPLUSRounded1c_400Regular',
+  medium: 'MPLUSRounded1c_500Medium',
+  bold: 'MPLUSRounded1c_700Bold',
 } as const;
 
 export const Typography: Record<string, TextStyle> = {
