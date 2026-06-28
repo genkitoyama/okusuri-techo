@@ -112,7 +112,7 @@ export default function SettingsScreen() {
         <Section title="アプリについて">
           <View style={styles.row}>
             <Text style={styles.rowLabel}>お薬手帳</Text>
-            <Text style={styles.rowValueDefault}>v1.2.0</Text>
+            <Text style={styles.rowValueDefault}>v1.3.0</Text>
           </View>
           <Text style={styles.note}>
             愛犬と奥さんの服薬を、可愛らしくシンプルに管理するアプリです 🐾

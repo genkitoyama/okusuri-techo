@@ -7,14 +7,17 @@ import { Calendar, LocaleConfig } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
+  clearDoseLog,
   DoseLog,
   listDoseLogsForProfileInRange,
   listMedicationsByProfile,
   Medication,
+  upsertDoseLog,
 } from '@/db/queries';
 import { useProfileStore } from '@/store/profile';
 import { Colors, Radius, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
+import { isoNow } from '@/utils/date';
 import { expandScheduleForMedication } from '@/utils/schedule';
 
 LocaleConfig.locales['ja'] = {
@@ -156,36 +159,58 @@ export default function CalendarScreen() {
             {dayDetails.length === 0 ? (
               <Text style={styles.empty}>この日のお薬はありません</Text>
             ) : (
-              dayDetails.map((d) => (
-                <View key={`${d.med.id}-${d.isoKey}`} style={styles.detailRow}>
-                  <View style={[styles.dot, { backgroundColor: d.med.color }]} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.detailName}>{d.med.name}</Text>
-                    <Text style={styles.detailMeta}>
-                      {d.timeKey}
-                      {d.med.dose ? ` ・ ${d.med.dose}` : ''}
-                    </Text>
-                  </View>
+              dayDetails.map((d) => {
+                const taken = d.log?.status === 'taken';
+                return (
                   <View
-                    style={[
-                      styles.statusPill,
-                      {
-                        backgroundColor:
-                          d.log?.status === 'taken' ? Colors.success : Colors.border,
-                      },
-                    ]}
+                    key={`${d.med.id}-${d.isoKey}`}
+                    style={styles.detailRow}
                   >
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: d.log?.status === 'taken' ? '#FFF' : Colors.textSub },
+                    <View
+                      style={[styles.dot, { backgroundColor: d.med.color }]}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.detailName}>{d.med.name}</Text>
+                      <Text style={styles.detailMeta}>
+                        {d.timeKey}
+                        {d.med.dose ? ` ・ ${d.med.dose}` : ''}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={async () => {
+                        if (taken) {
+                          await clearDoseLog(d.med.id, d.isoKey);
+                        } else {
+                          await upsertDoseLog(
+                            d.med.id,
+                            d.isoKey,
+                            'taken',
+                            isoNow()
+                          );
+                        }
+                        await load();
+                      }}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.statusPill,
+                        {
+                          backgroundColor: taken ? Colors.success : Colors.border,
+                        },
+                        pressed && { opacity: 0.7 },
                       ]}
                     >
-                      {d.log?.status === 'taken' ? 'あげた' : '未'}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.statusText,
+                          { color: taken ? '#FFF' : Colors.textSub },
+                        ]}
+                      >
+                        {taken ? 'あげた' : '未'}
+                      </Text>
+                    </Pressable>
                   </View>
-                </View>
-              ))
+                );
+              })
             )}
           </Pressable>
         </Pressable>
