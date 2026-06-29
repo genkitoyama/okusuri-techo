@@ -2,6 +2,28 @@
 
 このプロジェクトの全変更履歴。 形式は [Keep a Changelog](https://keepachangelog.com/) に準拠。
 
+## v1.3.1 — プロファイル写真の永続化 (2026-06-29)
+
+[Release](https://github.com/genkitoyama/okusuri-techo/releases/tag/v1.3.1) / PR: [#3](https://github.com/genkitoyama/okusuri-techo/pull/3)
+
+### 修正 (Fixed)
+
+- **プロファイル写真が突然表示されなくなる問題**
+  - `expo-image-picker` の crop 後の画像がアプリの cache directory に保存されていたため、 OS のキャッシュ削除タイミング (容量逼迫時 / アプリ更新時など) で実体が消えると `<Image>` が描画失敗していた
+  - 新規に選んだ写真は `documentDirectory/profiles/` に永続コピーするよう変更
+  - 起動時マイグレーションで既存 `photo_uri` を自動で永続パスに移し替え
+  - 実体が既に消えている場合は `photo_uri = NULL` にリセット (設定で再選択を促す)
+  - AsyncStorage の `profiles-cache` も migration 後に refresh されるので、 ウィジェットも自動追従
+
+### 追加 (Added)
+
+- `src/utils/profilePhoto.ts` — 写真の永続化 / マイグレーション helper
+- `expo-file-system` 依存 (`/legacy` API を使用)
+
+### 変更 (Changed)
+
+- バージョンを `v1.3.0` → `v1.3.1` に
+
 ## v1.3.0 — 過去のお薬チェック対応 (2026-06-28)
 
 [Release](https://github.com/genkitoyama/okusuri-techo/releases/tag/v1.3.0) / PR: [#2](https://github.com/genkitoyama/okusuri-techo/pull/2)
