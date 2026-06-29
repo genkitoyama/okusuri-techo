@@ -1,3 +1,5 @@
+import { migrateProfilePhotoIfNeeded } from '@/utils/profilePhoto';
+
 import { getDb } from './client';
 
 export async function runMigrations(): Promise<void> {
@@ -78,6 +80,25 @@ export async function runMigrations(): Promise<void> {
   );
   if (!profileCols.some((c) => c.name === 'photo_uri')) {
     await db.execAsync('ALTER TABLE profiles ADD COLUMN photo_uri TEXT');
+  }
+
+  // Profile photo を documentDirectory に移行(cache パスから永続パスへ)
+  try {
+    const rows = await db.getAllAsync<{ id: number; photo_uri: string | null }>(
+      "SELECT id, photo_uri FROM profiles WHERE photo_uri IS NOT NULL AND photo_uri != ''"
+    );
+    for (const row of rows) {
+      const next = await migrateProfilePhotoIfNeeded(row.photo_uri);
+      if (next !== row.photo_uri) {
+        await db.runAsync(
+          'UPDATE profiles SET photo_uri = ? WHERE id = ?',
+          next,
+          row.id
+        );
+      }
+    }
+  } catch (e) {
+    console.warn('[migrations] profile photo migration error', e);
   }
 
   const count = await db.getFirstAsync<{ c: number }>(
