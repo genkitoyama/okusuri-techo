@@ -6,6 +6,7 @@ import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'reac
 import { Profile } from '@/db/queries';
 import { Colors, Radius, Spacing } from '@/theme/colors';
 import { FontFamily } from '@/theme/typography';
+import { persistProfilePhoto } from '@/utils/profilePhoto';
 import { Button } from './Button';
 
 const DOG_EMOJIS = ['🐶', '🐕', '🐩', '🦴', '🐾'];
@@ -33,6 +34,16 @@ export function ProfileEditRow({ profile, onSave }: Props) {
     emoji !== profile.avatar_emoji ||
     photoUri !== (profile.photo_uri ?? null);
 
+  const adoptPickerResult = async (uri: string) => {
+    try {
+      const persisted = await persistProfilePhoto(uri);
+      setPhotoUri(persisted);
+    } catch (e) {
+      console.warn('[profile] persist photo error', e);
+      Alert.alert('写真の保存に失敗しました', 'もう一度お試しください。');
+    }
+  };
+
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
@@ -46,7 +57,7 @@ export function ProfileEditRow({ profile, onSave }: Props) {
       quality: 0.7,
     });
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      await adoptPickerResult(result.assets[0].uri);
     }
   };
 
@@ -62,7 +73,7 @@ export function ProfileEditRow({ profile, onSave }: Props) {
       quality: 0.7,
     });
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      await adoptPickerResult(result.assets[0].uri);
     }
   };
 
